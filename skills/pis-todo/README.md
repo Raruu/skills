@@ -8,7 +8,7 @@ Instead of pasting commit subjects into your timesheet, the skill reads your his
 
 - **`git`** on `PATH` — the collector reads commit history through it.
 - **Node.js 18+** — runs `collect-commits.mjs`, which works on Linux, macOS, and Windows without Bash or WSL.
-  If Node is unavailable.
+  If Node is unavailable, the bundled `collect-commits.sh` produces identical output but needs a POSIX shell.
 - **`profile-plus` MCP server** — only for creating the todos. The skill still drafts everything if the MCP is absent; it just cannot save.
 
 ## Usage
@@ -78,3 +78,13 @@ Each commit is reported as hash, date, subject, file count, +/− lines, and up 
 ## Install
 
 See the [root README](../../README.md#install) for both install paths (skills CLI and the install script).
+
+The installers live in this folder and can be run from here:
+
+```bash
+bash install.sh
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File install.ps1
+```

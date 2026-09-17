@@ -2,12 +2,12 @@
 # install.ps1 - install the pis-todo skill (and the OpenCode slash command).
 #
 # Usage:
-#   irm https://raw.githubusercontent.com/Raruu/skills/main/install.ps1 | iex
-#   powershell -ExecutionPolicy Bypass -File install.ps1    # from a local clone
+#   irm https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.ps1 | iex
+#   powershell -ExecutionPolicy Bypass -File install.ps1    # from inside this skill folder
 #
 # Installs:
-#   skills\pis-todo\             -> %USERPROFILE%\.agents\skills\pis-todo\
-#   opencode\command\pis-todo.md -> %USERPROFILE%\.config\opencode\command\pis-todo.md
+#   <skill folder>\            -> %USERPROFILE%\.agents\skills\pis-todo\
+#   <skill folder>\opencode\   -> %USERPROFILE%\.config\opencode\command\pis-todo.md
 #
 # Exit codes: 0 ok | 1 failure
 #
@@ -22,13 +22,25 @@ function Fail       { param([string]$Message) Write-Error $Message; exit 1 }
 
 $RepoZip = 'https://codeload.github.com/Raruu/skills/zip/refs/heads/main'
 
+# --- destinations ------------------------------------------------------------
+$HomeDir         = $env:USERPROFILE
+$SkillDest       = Join-Path $HomeDir '.agents\skills\pis-todo'
+$CommandDestDir  = Join-Path $HomeDir '.config\opencode\command'
+$CommandDest     = Join-Path $CommandDestDir 'pis-todo.md'
+
+# Backups live outside ~\.agents\skills so the agent's skill scanner does not
+# pick up the old copy (it would log a name-mismatch error on every start).
+$BackupDir       = Join-Path $HomeDir '.agents\skill-backups'
+
 # --- locate the source files -------------------------------------------------
+# Local mode: this script sits inside the skill folder, next to SKILL.md.
+# Remote mode: piped through `irm | iex`, so download the repo first.
 $ScriptDir = $PSScriptRoot
 if ([string]::IsNullOrEmpty($ScriptDir)) { $ScriptDir = (Get-Location).Path }
 
 $TmpDir = $null
 
-if (Test-Path (Join-Path $ScriptDir 'skills\pis-todo')) {
+if (Test-Path (Join-Path $ScriptDir 'SKILL.md')) {
     $Src = $ScriptDir
     Write-Say "Using local checkout: $Src"
 }
@@ -46,19 +58,18 @@ else {
     }
     $extracted = Get-ChildItem -Path $TmpDir -Directory | Select-Object -First 1
     if ($null -eq $extracted) { Fail 'unexpected archive layout' }
-    $Src = $extracted.FullName
-    if (-not (Test-Path (Join-Path $Src 'skills\pis-todo'))) { Fail 'unexpected archive layout' }
+    $Src = Join-Path $extracted.FullName 'skills\pis-todo'
+    if (-not (Test-Path (Join-Path $Src 'SKILL.md'))) { Fail 'unexpected archive layout' }
 }
 
-# --- destinations ------------------------------------------------------------
-$HomeDir         = $env:USERPROFILE
-$SkillDest       = Join-Path $HomeDir '.agents\skills\pis-todo'
-$CommandDestDir  = Join-Path $HomeDir '.config\opencode\command'
-$CommandDest     = Join-Path $CommandDestDir 'pis-todo.md'
-
-# Backups live outside ~\.agents\skills so the agent's skill scanner does not
-# pick up the old copy (it would log a name-mismatch error on every start).
-$BackupDir       = Join-Path $HomeDir '.agents\skill-backups'
+# --- guard: refuse to install onto itself ------------------------------------
+# The skills CLI copies this whole folder, installer included. Running it from
+# the installed location would back the folder up and then copy nothing.
+$SrcReal  = (Resolve-Path $Src -ErrorAction SilentlyContinue).Path
+$DestReal = (Resolve-Path $SkillDest -ErrorAction SilentlyContinue).Path
+if ($SrcReal -and $DestReal -and ($SrcReal.TrimEnd('\') -ieq $DestReal.TrimEnd('\'))) {
+    Fail "this installer is already running from $SkillDest; nothing to do"
+}
 
 function Backup-IfExists {
     param([string]$Target, [string]$Label)
@@ -78,7 +89,7 @@ try {
     New-Item -ItemType Directory -Path (Split-Path $SkillDest -Parent) -Force | Out-Null
     Backup-IfExists -Target $SkillDest -Label 'pis-todo'
     New-Item -ItemType Directory -Path $SkillDest -Force | Out-Null
-    Copy-Item -Path (Join-Path $Src 'skills\pis-todo\*') -Destination $SkillDest -Recurse -Force
+    Copy-Item -Path (Join-Path $Src '*') -Destination $SkillDest -Recurse -Force
     Write-Say "Installed skill -> $SkillDest"
 }
 catch {

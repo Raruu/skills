@@ -3,12 +3,12 @@
 # install.sh — install the pis-todo skill (and the OpenCode slash command).
 #
 # Works two ways:
-#   curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/install.sh | bash
-#   bash install.sh                     # from inside a clone of the repo
+#   curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.sh | bash
+#   bash install.sh                     # from inside this skill folder
 #
 # Installs:
-#   skills/pis-todo/            -> ~/.agents/skills/pis-todo/
-#   opencode/command/pis-todo.md -> ~/.config/opencode/command/pis-todo.md
+#   <skill folder>/            -> ~/.agents/skills/pis-todo/
+#   <skill folder>/opencode/   -> ~/.config/opencode/command/pis-todo.md
 #
 # Exit codes: 0 ok | 1 failure
 #
@@ -20,8 +20,18 @@ say()  { printf '%s\n' "$*"; }
 warn() { printf 'WARN: %s\n' "$*" >&2; }
 die()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
+# --- destinations ------------------------------------------------------------
+SKILL_DEST="$HOME/.agents/skills/pis-todo"
+COMMAND_DEST_DIR="$HOME/.config/opencode/command"
+COMMAND_DEST="$COMMAND_DEST_DIR/pis-todo.md"
+
+# Backups live outside ~/.agents/skills so the agent's skill scanner does not
+# pick up the old copy (it would log a name-mismatch error on every start).
+BACKUP_DIR="$HOME/.agents/skill-backups"
+
 # --- locate the source files -------------------------------------------------
-# When piped through `curl | bash` there is no local checkout, so download one.
+# Local mode: this script sits inside the skill folder, next to SKILL.md.
+# Remote mode: piped through `curl | bash`, so download the repo first.
 SCRIPT_DIR=""
 if [ -n "${BASH_SOURCE[0]:-}" ] && [ -f "${BASH_SOURCE[0]}" ]; then
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,7 +41,7 @@ TMP_DIR=""
 cleanup() { [ -n "$TMP_DIR" ] && rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-if [ -n "$SCRIPT_DIR" ] && [ -d "$SCRIPT_DIR/skills/pis-todo" ]; then
+if [ -n "$SCRIPT_DIR" ] && [ -f "$SCRIPT_DIR/SKILL.md" ]; then
   SRC="$SCRIPT_DIR"
   say "Using local checkout: $SRC"
 else
@@ -40,18 +50,19 @@ else
   TMP_DIR="$(mktemp -d)"
   say "Downloading Raruu/skills..."
   curl -fsSL "$REPO_TARBALL" | tar -xz -C "$TMP_DIR" || die "download or extraction failed"
-  SRC="$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d | head -1)"
-  [ -n "$SRC" ] && [ -d "$SRC/skills/pis-todo" ] || die "unexpected archive layout"
+  ROOT="$(find "$TMP_DIR" -maxdepth 1 -mindepth 1 -type d | head -1)"
+  SRC="$ROOT/skills/pis-todo"
+  [ -f "$SRC/SKILL.md" ] || die "unexpected archive layout"
 fi
 
-# --- destinations ------------------------------------------------------------
-SKILL_DEST="$HOME/.agents/skills/pis-todo"
-COMMAND_DEST_DIR="$HOME/.config/opencode/command"
-COMMAND_DEST="$COMMAND_DEST_DIR/pis-todo.md"
-
-# Backups live outside ~/.agents/skills so the agent's skill scanner does not
-# pick up the old copy (it would log a name-mismatch error on every start).
-BACKUP_DIR="$HOME/.agents/skill-backups"
+# --- guard: refuse to install onto itself ------------------------------------
+# The skills CLI copies this whole folder, installer included. Running it from
+# the installed location would back the folder up and then copy nothing.
+SRC_REAL="$(cd "$SRC" && pwd -P)"
+DEST_REAL="$(cd "$SKILL_DEST" 2>/dev/null && pwd -P || printf '')"
+if [ -n "$DEST_REAL" ] && [ "$SRC_REAL" = "$DEST_REAL" ]; then
+  die "this installer is already running from $SKILL_DEST; nothing to do"
+fi
 
 backup_if_exists() { # backup_if_exists <path> <label>
   local target="$1" label="$2"
@@ -68,7 +79,7 @@ backup_if_exists() { # backup_if_exists <path> <label>
 mkdir -p "$(dirname "$SKILL_DEST")"
 backup_if_exists "$SKILL_DEST" "pis-todo"
 mkdir -p "$SKILL_DEST"
-cp -R "$SRC/skills/pis-todo/." "$SKILL_DEST/"
+cp -R "$SRC/." "$SKILL_DEST/"
 chmod +x "$SKILL_DEST/scripts/collect-commits.sh" 2>/dev/null || true
 chmod +x "$SKILL_DEST/scripts/collect-commits.mjs" 2>/dev/null || true
 say "Installed skill -> $SKILL_DEST"

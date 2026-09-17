@@ -30,13 +30,13 @@ Also drops the `/pis-todo` slash command into your OpenCode config.
 **Linux, macOS, WSL, Git Bash**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.sh | bash
 ```
 
 **Windows (PowerShell)**
 
 ```powershell
-irm https://raw.githubusercontent.com/Raruu/skills/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.ps1 | iex
 ```
 
 Both scripts back up anything they overwrite to `~/.agents/skill-backups/` (kept outside `skills/` so the agent's skill scanner does not try to load the old copy) and warn if a duplicate skill copy is found.
@@ -48,13 +48,14 @@ Per-skill requirements are listed in each skill's README.
 
 ```
 .
-├── install.sh / install.ps1        # optional installers (skill + OpenCode slash command)
 ├── skills.sh.json                  # groups shown on the skills.sh repo page
-├── opencode/command/pis-todo.md    # source of the slash command
 └── skills/
     └── pis-todo/
         ├── SKILL.md                # what the agent loads
         ├── README.md               # usage guide
+        ├── install.sh              # installer (skill + OpenCode slash command)
+        ├── install.ps1             # Windows installer
+        ├── opencode/command/       # source of the slash command
         └── scripts/
             ├── collect-commits.mjs # cross-platform collector (Node)
             └── collect-commits.sh  # identical output, POSIX shell fallback
