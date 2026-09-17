@@ -1,9 +1,5 @@
 # Skills
 
-[![skills.sh](https://skills.sh/b/Raruu/skills)](https://skills.sh/Raruu/skills)
-
-Agent skills by [Raruu](https://github.com/Raruu).
-
 ## Skills
 
 | Skill | What it does | Docs |
@@ -26,7 +22,6 @@ Target a specific agent explicitly if you don't want to be prompted:
 npx skills add Raruu/skills --skill pis-todo -g -a opencode
 ```
 
-> **Note:** for OpenCode, the `skills` CLI installs to `~/.config/opencode/skills/`. OpenCode also reads `~/.agents/skills/`. Installing to both locations is fine but produces a `duplicate skill name` warning in the logs — pick one. The install script below uses `~/.agents/skills/`, which is shared with more agents.
 
 ### Option 2 — install script (skill + slash command)
 
@@ -47,11 +42,6 @@ irm https://raw.githubusercontent.com/Raruu/skills/main/install.ps1 | iex
 Both scripts back up anything they overwrite to `~/.agents/skill-backups/` (kept outside `skills/` so the agent's skill scanner does not try to load the old copy) and warn if a duplicate skill copy is found.
 
 ## Requirements
-
-- **`git`** on `PATH` — the collectors read commit history through it.
-- **Node.js 18+** — runs the cross-platform collector; a POSIX shell fallback ships alongside it.
-- **`profile-plus` MCP server** — required by `pis-todo` to save the todos it drafts.
-
 Per-skill requirements are listed in each skill's README.
 
 ## Repo layout
