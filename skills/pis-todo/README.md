@@ -11,6 +11,40 @@ Instead of pasting commit subjects into your timesheet, the skill reads your his
   If Node is unavailable, the bundled `collect-commits.sh` produces identical output but needs a POSIX shell.
 - **`profile-plus` MCP server** — only for creating the todos. The skill still drafts everything if the MCP is absent; it just cannot save.
 
+## Install
+
+### Option 1 — skills CLI
+
+Installs the skill file only (no slash command):
+
+```bash
+npx skills add Raruu/skills --skill pis-todo -g
+```
+
+Target a specific agent explicitly if you don't want to be prompted:
+
+```bash
+npx skills add Raruu/skills --skill pis-todo -g -a opencode
+```
+
+### Option 2 — install script (skill + slash command)
+
+Also drops the `/pis-todo` slash command into your OpenCode config.
+
+**Linux, macOS, WSL, Git Bash**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.sh | bash
+```
+
+**Windows (PowerShell)**
+
+```powershell
+irm https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.ps1 | iex
+```
+
+Reinstalling replaces the installed copy outright and warns if a duplicate skill copy is found.
+
 ## Usage
 
 ```
@@ -74,17 +108,3 @@ node scripts/collect-commits.mjs --repo <path> --since <yyyy-MM-dd> [--until <yy
 | `--mark-from <date>` | Flag commits on/after this date as possible duplicates |
 
 Each commit is reported as hash, date, subject, file count, +/− lines, and up to 12 file paths, followed by a `TOTAL` footer. `WARN: possible duplicate` appears when a commit's date is on/after `--mark-from`. `NO_COMMITS` means the range was empty.
-
-## Install
-
-See the [root README](../../README.md#install) for both install paths (skills CLI and the install script).
-
-The installers live in this folder and can be run from here:
-
-```bash
-bash install.sh
-```
-
-```powershell
-powershell -ExecutionPolicy Bypass -File install.ps1
-```

@@ -5,43 +5,8 @@
 | Skill | What it does | Docs |
 |---|---|---|
 | [`pis-todo`](./skills/pis-todo) | Turns a range of git commits into human-readable work-log entries (`<Module> -> <activity> : <duration>`) and creates them as todos via the `profile-plus` MCP — optionally marking them complete in the same run. | [docs](./skills/pis-todo/README.md) |
-
-## Install
-
-### Option 1 — skills CLI
-
-Installs the skill file only (no slash command):
-
-```bash
-npx skills add Raruu/skills --skill pis-todo -g
-```
-
-Target a specific agent explicitly if you don't want to be prompted:
-
-```bash
-npx skills add Raruu/skills --skill pis-todo -g -a opencode
-```
-
-
-### Option 2 — install script (skill + slash command)
-
-Also drops the `/pis-todo` slash command into your OpenCode config.
-
-**Linux, macOS, WSL, Git Bash**
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.sh | bash
-```
-
-**Windows (PowerShell)**
-
-```powershell
-irm https://raw.githubusercontent.com/Raruu/skills/main/skills/pis-todo/install.ps1 | iex
-```
-
-Both scripts back up anything they overwrite to `~/.agents/skill-backups/` (kept outside `skills/` so the agent's skill scanner does not try to load the old copy) and warn if a duplicate skill copy is found.
-
 ## Requirements
+
 Per-skill requirements are listed in each skill's README.
 
 ## Repo layout

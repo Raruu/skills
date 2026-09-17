@@ -25,10 +25,6 @@ SKILL_DEST="$HOME/.agents/skills/pis-todo"
 COMMAND_DEST_DIR="$HOME/.config/opencode/command"
 COMMAND_DEST="$COMMAND_DEST_DIR/pis-todo.md"
 
-# Backups live outside ~/.agents/skills so the agent's skill scanner does not
-# pick up the old copy (it would log a name-mismatch error on every start).
-BACKUP_DIR="$HOME/.agents/skill-backups"
-
 # --- locate the source files -------------------------------------------------
 # Local mode: this script sits inside the skill folder, next to SKILL.md.
 # Remote mode: piped through `curl | bash`, so download the repo first.
@@ -57,27 +53,16 @@ fi
 
 # --- guard: refuse to install onto itself ------------------------------------
 # The skills CLI copies this whole folder, installer included. Running it from
-# the installed location would back the folder up and then copy nothing.
+# the installed location would delete the folder it is reading from.
 SRC_REAL="$(cd "$SRC" && pwd -P)"
 DEST_REAL="$(cd "$SKILL_DEST" 2>/dev/null && pwd -P || printf '')"
 if [ -n "$DEST_REAL" ] && [ "$SRC_REAL" = "$DEST_REAL" ]; then
   die "this installer is already running from $SKILL_DEST; nothing to do"
 fi
 
-backup_if_exists() { # backup_if_exists <path> <label>
-  local target="$1" label="$2"
-  if [ -e "$target" ]; then
-    local stamp
-    stamp="$(date +%Y%m%d%H%M%S)"
-    mkdir -p "$BACKUP_DIR"
-    mv "$target" "$BACKUP_DIR/${label}.bak-${stamp}"
-    say "Backed up existing ${label} -> $BACKUP_DIR/${label}.bak-${stamp}"
-  fi
-}
-
 # --- install the skill -------------------------------------------------------
 mkdir -p "$(dirname "$SKILL_DEST")"
-backup_if_exists "$SKILL_DEST" "pis-todo"
+rm -rf "$SKILL_DEST"
 mkdir -p "$SKILL_DEST"
 cp -R "$SRC/." "$SKILL_DEST/"
 chmod +x "$SKILL_DEST/scripts/collect-commits.sh" 2>/dev/null || true
@@ -87,7 +72,7 @@ say "Installed skill -> $SKILL_DEST"
 # --- install the slash command ----------------------------------------------
 if [ -f "$SRC/opencode/command/pis-todo.md" ]; then
   mkdir -p "$COMMAND_DEST_DIR"
-  backup_if_exists "$COMMAND_DEST" "pis-todo.md"
+  rm -f "$COMMAND_DEST"
   cp "$SRC/opencode/command/pis-todo.md" "$COMMAND_DEST"
   say "Installed command -> $COMMAND_DEST"
 fi
