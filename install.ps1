@@ -56,20 +56,27 @@ $SkillDest       = Join-Path $HomeDir '.agents\skills\pis-todo'
 $CommandDestDir  = Join-Path $HomeDir '.config\opencode\command'
 $CommandDest     = Join-Path $CommandDestDir 'pis-todo.md'
 
+# Backups live outside ~\.agents\skills so the agent's skill scanner does not
+# pick up the old copy (it would log a name-mismatch error on every start).
+$BackupDir       = Join-Path $HomeDir '.agents\skill-backups'
+
 function Backup-IfExists {
-    param([string]$Target)
+    param([string]$Target, [string]$Label)
     if (Test-Path $Target) {
         $stamp = Get-Date -Format 'yyyyMMddHHmmss'
-        $backup = "$Target.bak-$stamp"
+        if (-not (Test-Path $BackupDir)) {
+            New-Item -ItemType Directory -Path $BackupDir -Force | Out-Null
+        }
+        $backup = Join-Path $BackupDir "$Label.bak-$stamp"
         Move-Item -Path $Target -Destination $backup -Force
-        Write-Say "Backed up existing $(Split-Path $Target -Leaf) -> $(Split-Path $backup -Leaf)"
+        Write-Say "Backed up existing $Label -> $backup"
     }
 }
 
 # --- install the skill -------------------------------------------------------
 try {
     New-Item -ItemType Directory -Path (Split-Path $SkillDest -Parent) -Force | Out-Null
-    Backup-IfExists -Target $SkillDest
+    Backup-IfExists -Target $SkillDest -Label 'pis-todo'
     New-Item -ItemType Directory -Path $SkillDest -Force | Out-Null
     Copy-Item -Path (Join-Path $Src 'skills\pis-todo\*') -Destination $SkillDest -Recurse -Force
     Write-Say "Installed skill -> $SkillDest"
@@ -83,7 +90,7 @@ $commandSource = Join-Path $Src 'opencode\command\pis-todo.md'
 if (Test-Path $commandSource) {
     try {
         New-Item -ItemType Directory -Path $CommandDestDir -Force | Out-Null
-        Backup-IfExists -Target $CommandDest
+        Backup-IfExists -Target $CommandDest -Label 'pis-todo.md'
         Copy-Item -Path $commandSource -Destination $CommandDest -Force
         Write-Say "Installed command -> $CommandDest"
     }

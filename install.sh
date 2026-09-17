@@ -49,19 +49,24 @@ SKILL_DEST="$HOME/.agents/skills/pis-todo"
 COMMAND_DEST_DIR="$HOME/.config/opencode/command"
 COMMAND_DEST="$COMMAND_DEST_DIR/pis-todo.md"
 
-backup_if_exists() { # backup_if_exists <path>
-  local target="$1"
+# Backups live outside ~/.agents/skills so the agent's skill scanner does not
+# pick up the old copy (it would log a name-mismatch error on every start).
+BACKUP_DIR="$HOME/.agents/skill-backups"
+
+backup_if_exists() { # backup_if_exists <path> <label>
+  local target="$1" label="$2"
   if [ -e "$target" ]; then
     local stamp
     stamp="$(date +%Y%m%d%H%M%S)"
-    mv "$target" "${target}.bak-${stamp}"
-    say "Backed up existing $(basename "$target") -> $(basename "$target").bak-${stamp}"
+    mkdir -p "$BACKUP_DIR"
+    mv "$target" "$BACKUP_DIR/${label}.bak-${stamp}"
+    say "Backed up existing ${label} -> $BACKUP_DIR/${label}.bak-${stamp}"
   fi
 }
 
 # --- install the skill -------------------------------------------------------
 mkdir -p "$(dirname "$SKILL_DEST")"
-backup_if_exists "$SKILL_DEST"
+backup_if_exists "$SKILL_DEST" "pis-todo"
 mkdir -p "$SKILL_DEST"
 cp -R "$SRC/skills/pis-todo/." "$SKILL_DEST/"
 chmod +x "$SKILL_DEST/scripts/collect-commits.sh" 2>/dev/null || true
@@ -71,7 +76,7 @@ say "Installed skill -> $SKILL_DEST"
 # --- install the slash command ----------------------------------------------
 if [ -f "$SRC/opencode/command/pis-todo.md" ]; then
   mkdir -p "$COMMAND_DEST_DIR"
-  backup_if_exists "$COMMAND_DEST"
+  backup_if_exists "$COMMAND_DEST" "pis-todo.md"
   cp "$SRC/opencode/command/pis-todo.md" "$COMMAND_DEST"
   say "Installed command -> $COMMAND_DEST"
 fi

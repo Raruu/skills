@@ -44,7 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/Raruu/skills/main/install.sh | bash
 irm https://raw.githubusercontent.com/Raruu/skills/main/install.ps1 | iex
 ```
 
-Both scripts back up anything they overwrite and warn if a duplicate skill copy is found.
+Both scripts back up anything they overwrite to `~/.agents/skill-backups/` (kept outside `skills/` so the agent's skill scanner does not try to load the old copy) and warn if a duplicate skill copy is found.
 
 ## Requirements
 
