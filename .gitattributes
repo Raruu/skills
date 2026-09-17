@@ -1,0 +1,12 @@
+# Normalize line endings so shell and Node scripts stay runnable on every OS.
+* text=auto eol=lf
+
+*.sh   text eol=lf
+*.mjs  text eol=lf
+*.md   text eol=lf
+*.json text eol=lf
+*.ps1  text eol=crlf
+
+*.png  binary
+*.jpg  binary
+*.gif  binary

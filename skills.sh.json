@@ -1,0 +1,13 @@
+{
+  "$schema": "https://skills.sh/schemas/skills.sh.schema.json",
+  "notGrouped": "bottom",
+  "groupings": [
+    {
+      "title": "Work Logging",
+      "description": "Turn your git history into the human-readable activity entries you actually report.",
+      "skills": [
+        "pis-todo"
+      ]
+    }
+  ]
+}
