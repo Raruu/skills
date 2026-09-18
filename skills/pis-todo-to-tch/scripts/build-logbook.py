@@ -19,6 +19,10 @@ directory (--config overrides the path). If it does not exist yet, it is
 created from the shipped example and the script exits 2 so the user can edit
 it before generating.
 
+Setup: `--setup` prints a read-only JSON report about the working directory
+(config state, git/ignore state, python, libs, fonts, assets) and exits 0.
+It never creates or modifies anything.
+
 Exit codes: 0 ok | 1 error | 2 config was just created from the example (edit it first)
 """
 
@@ -530,6 +534,87 @@ def render_pdf(out_path: Path, cfg: dict, days: list[dict], label: str,
 # main
 # --------------------------------------------------------------------------- #
 
+def git_status(cwd: Path, config_name: str) -> dict:
+    """Report whether cwd is inside a git repo and whether the config is ignored."""
+    import subprocess
+
+    def run(args: list[str]) -> str | None:
+        try:
+            p = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True,
+                               text=True, timeout=10)
+        except (OSError, subprocess.SubprocessError):
+            return None
+        return p.stdout.strip() if p.returncode == 0 else None
+
+    root = run(["rev-parse", "--show-toplevel"])
+    if root:
+        # check-ignore -q prints nothing on success, so use the return code
+        try:
+            p = subprocess.run(["git", "check-ignore", "-q", config_name],
+                               cwd=str(cwd), capture_output=True, timeout=10)
+            ignored = p.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            ignored = False
+        return {"repo": True, "root": root, "ignored": ignored}
+
+    # Fallback without git: look for .git in cwd and scan .gitignore
+    if (cwd / ".git").exists():
+        ignored = False
+        gi = cwd / ".gitignore"
+        if gi.exists():
+            lines = [l.strip() for l in gi.read_text(encoding="utf-8").splitlines()]
+            ignored = any(l and not l.startswith("#")
+                          and l.rstrip("/") in (config_name, f"*.json") for l in lines)
+        return {"repo": True, "root": str(cwd), "ignored": ignored}
+    return {"repo": False, "root": None, "ignored": False}
+
+
+def setup_report(cwd: Path) -> dict:
+    """Environment report for `/pis-todo-to-tch SETUP` (read-only)."""
+    import importlib.util
+
+    config_path = cwd / CONFIG_FILENAME
+    report: dict = {
+        "ok": True,
+        "cwd": str(cwd),
+        "config_path": str(config_path),
+        "config_exists": config_path.exists(),
+        "config": None,
+        "config_error": None,
+        "git": git_status(cwd, CONFIG_FILENAME),
+        "python": ".".join(str(v) for v in sys.version_info[:3]),
+        "libs": {
+            "docx": importlib.util.find_spec("docx") is not None,
+            "fpdf": importlib.util.find_spec("fpdf") is not None,
+        },
+        "fonts": {"serif_found": find_serif_fonts()[0] is not None},
+        "assets": {
+            "template": DEFAULT_TEMPLATE.exists(),
+            "logo": DEFAULT_LOGO.exists(),
+            "example_config": EXAMPLE_CONFIG.exists(),
+        },
+    }
+
+    if config_path.exists():
+        try:
+            cfg = json.loads(config_path.read_text(encoding="utf-8"))
+            if not isinstance(cfg, dict):
+                report["config_error"] = "config harus berupa objek JSON"
+            else:
+                required = ["nama", "nim", "program_studi", "mitra_industri",
+                            "dosen_pembimbing", "pembimbing_lapangan"]
+                missing = [k for k in required if not str(cfg.get(k, "")).strip()]
+                if missing:
+                    report["config_error"] = f"kurang field: {', '.join(missing)}"
+                else:
+                    report["config"] = cfg
+        except json.JSONDecodeError as e:
+            report["config_error"] = (
+                f"bukan JSON yang valid (baris {e.lineno}, kolom {e.colno}): {e.msg}"
+            )
+    return report
+
+
 def load_config(path: Path, explicit: bool) -> dict:
     """Read the personal config. When the default workdir config is missing,
     create it from the shipped example and exit 2 so the user can edit it."""
@@ -543,7 +628,8 @@ def load_config(path: Path, explicit: bool) -> dict:
         print(f"CONFIG_CREATED: {path} dibuat dari config.example.json.", file=sys.stderr)
         print("Edit datanya dulu (nama, nim, program_studi, mitra_industri, "
               "dosen_pembimbing, pembimbing_lapangan), lalu jalankan lagi.", file=sys.stderr)
-        if (path.parent / ".git").exists():
+        git = git_status(path.parent, path.name)
+        if git["repo"] and not git["ignored"]:
             print(f"HINT: config ini berisi data pribadi — tambahkan "
                   f"'{path.name}' ke .gitignore di folder ini.", file=sys.stderr)
         sys.exit(2)
@@ -576,7 +662,13 @@ def main() -> int:
     ap.add_argument("--template", default=str(DEFAULT_TEMPLATE))
     ap.add_argument("--resolve-only", action="store_true",
                     help="hanya cetak resolusi periode (tanpa config/data/generate)")
+    ap.add_argument("--setup", action="store_true",
+                    help="cetak laporan lingkungan workdir (read-only, untuk mode SETUP)")
     args = ap.parse_args()
+
+    if args.setup:
+        print(json.dumps(setup_report(Path.cwd()), ensure_ascii=False, indent=2))
+        return 0
 
     today = date.today()
 

@@ -5,7 +5,7 @@
 | Skill | What it does | Docs |
 |---|---|---|
 | [`pis-todo`](./skills/pis-todo) | Turns a range of git commits into human-readable work-log entries (`<Module> -> <activity> : <duration>`) and creates them as todos via the `profile-plus` MCP — optionally marking them complete in the same run. | [docs](./skills/pis-todo/README.md) |
-| [`pis-todo-to-tch`](./skills/pis-todo-to-tch) | Turns Profile Plus todos and attendance into a formatted internship log book (DOCX + PDF) using the Polinema template — month, week, or date-range periods. | [docs](./skills/pis-todo-to-tch/README.md) |
+| [`pis-todo-to-tch`](./skills/pis-todo-to-tch) | Turns Profile Plus todos and attendance into a formatted internship log book (DOCX + PDF) using the Polinema template — month, week, or date-range periods, plus `SETUP` to bootstrap a new working folder. | [docs](./skills/pis-todo-to-tch/README.md) |
 
 ## Requirements
 

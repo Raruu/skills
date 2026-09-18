@@ -51,6 +51,7 @@ Reinstalling replaces the installed copy outright and warns if a duplicate skill
 
 ```
 /pis-todo-to-tch <periode>, <word|pdf>
+/pis-todo-to-tch SETUP
 ```
 
 Both segments are optional. Without a period, the current month (1st → today) is used. Without a format, both DOCX and PDF are generated.
@@ -62,6 +63,17 @@ Both segments are optional. Without a period, the current month (1st → today) 
 | `September/minggu 2` | Calendar week 2 (Mon–Sun), clipped to the month |
 | `September/minggu 2->3` | Calendar weeks 2 through 3 |
 | `Tanggal 2026-09-01 -> 2026-09-15` | Explicit date range (only this date format) |
+
+### SETUP
+
+`/pis-todo-to-tch SETUP` prepares an empty working folder without generating anything:
+
+- shows an environment report (config status, Python/libs, fonts, git),
+- asks for your personal data (or offers selective updates if the config already exists),
+- optionally adds `.pis-todo-to-tch.json` to `.gitignore`,
+- smoke-tests the `profile-plus` MCP connection.
+
+After SETUP, run `/pis-todo-to-tch` to generate the current month.
 
 ## Example
 

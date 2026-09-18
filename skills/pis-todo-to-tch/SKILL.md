@@ -1,6 +1,6 @@
 ---
 name: pis-todo-to-tch
-description: "Turn Profile Plus todos (MCP profile-plus) into a formatted Polinema internship log book (DOCX + PDF). Use whenever the user runs /pis-todo-to-tch, or asks to \"buat log book\", \"bikin laporan magang\", \"generate log book\", \"cetak log book\", \"rekap todo jadi log book\", \"log book bulanan\", or wants their Profile Plus todo/attendance data converted into the official LOG BOOK KEGIATAN document. Supports month, month/week, and date-range periods, and outputs to a 'Laporan <Bulan>' folder in the current working directory."
+description: "Turn Profile Plus todos (MCP profile-plus) into a formatted Polinema internship log book (DOCX + PDF). Use whenever the user runs /pis-todo-to-tch, or asks to \"buat log book\", \"bikin laporan magang\", \"generate log book\", \"cetak log book\", \"rekap todo jadi log book\", \"log book bulanan\", or wants their Profile Plus todo/attendance data converted into the official LOG BOOK KEGIATAN document. Supports month, month/week, and date-range periods, and outputs to a 'Laporan <Bulan>' folder in the current working directory. The SETUP argument bootstraps an empty working folder (personal config, environment report)."
 ---
 
 # PIS Todo → TCH (Log Book) — Profile Plus → Log Book DOCX/PDF
@@ -13,6 +13,7 @@ The output follows the Polinema template: letterhead header, student info table,
 
 ```
 /pis-todo-to-tch <periode>, <word|pdf>
+/pis-todo-to-tch SETUP
 ```
 
 Both segments are optional.
@@ -21,6 +22,8 @@ Both segments are optional.
 |---|---|
 | 1 | Period. Empty = current month (1st → today). |
 | 2 | Output format: `word`, `pdf`, or empty = both. |
+
+`SETUP` (case-insensitive, alone) is not a period — it switches to setup mode (see below). If the argument is exactly `SETUP`, jump to **Setup mode** and do not generate any document.
 
 Period formats:
 
@@ -41,7 +44,31 @@ Examples:
 /pis-todo-to-tch September 2026, pdf
 /pis-todo-to-tch September/minggu 2->3
 /pis-todo-to-tch Tanggal 2026-09-01 -> 2026-09-15, word
+/pis-todo-to-tch SETUP
 ```
+
+## Setup mode (`/pis-todo-to-tch SETUP`)
+
+Bootstraps an empty working folder. **Never generate a document in this mode** — only config, and only after the user answers.
+
+1. Run the environment report from the user's workspace (working directory):
+   ```
+   python3 <skill-dir>/scripts/build-logbook.py --setup
+   ```
+   It is read-only (creates nothing) and prints JSON: `cwd`, `config_exists`, `config`, `config_error`, `git` (`repo`/`root`/`ignored`), `python`, `libs` (`docx`/`fpdf`), `fonts.serif_found`, `assets`.
+
+2. Show a short summary: the working folder (confirm it is the intended one), config status, missing libraries, git state.
+
+3. **Config**:
+   - `config` present → show the current values, then ask via the question tool which fields to update (multi-select, one option per field plus "semua sudah benar"). If the user picks fields, ask for their new values and rewrite the file. Keep the JSON shape.
+   - `config_exists` false or `config_error` set → ask via the question tool for the six fields (`nama`, `nim`, `program_studi`, `mitra_industri`, `dosen_pembimbing`, `pembimbing_lapangan`) — one question per field, using the example values as the offered options where helpful. Then write `.pis-todo-to-tch.json` in the working folder.
+   - Always re-run `--setup` afterwards to confirm the file parses and has no missing fields, and report the result.
+
+4. **Git**: if `git.repo` is true and `git.ignored` is false, ask whether to add `.pis-todo-to-tch.json` to `.gitignore` at `git.root`. If the user agrees, append the line (create the file if needed) and confirm with `--setup` that `ignored` is now true. If not a repo, skip.
+
+5. **MCP smoke test**: call `profile-plus_get_todo_history` with `limit: 1`. Report OK or the failure — this is informational, not a blocker.
+
+6. **Final report**: config path, git state, libs, MCP, plus suggested next command (e.g. `/pis-todo-to-tch` for the current month). Do not generate anything.
 
 ## Step 1 — Resolve the period
 
@@ -135,6 +162,11 @@ Example:
 
 ## Edge cases
 
+- **SETUP with other arguments** (e.g. `/pis-todo-to-tch SETUP, September`) → treat `SETUP` as the mode and ignore the rest; mention it.
+- **SETUP when config is already valid** → do not overwrite silently; show values and offer selective updates.
+- **SETUP in a non-git folder** → skip the `.gitignore` step entirely.
+- **SETUP when libs are missing** → report it in the summary and include the `pip install python-docx fpdf2` hint; still finish the other steps.
+- **SETUP when MCP is unreachable** → report the smoke-test failure and continue; the user can fix the MCP config later.
 - **Invalid period** → relay the script's `ERROR:` message; suggest a valid format.
 - **Config missing in workdir** → the script creates `.pis-todo-to-tch.json` from the example and exits 2; show it to the user and wait for confirmation before generating.
 - **Config invalid JSON or missing fields** → the script prints a friendly `ERROR:`; fix the file (or ask the user) before retrying.
