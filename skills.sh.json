@@ -4,9 +4,10 @@
   "groupings": [
     {
       "title": "Work Logging",
-      "description": "Turn your git history into the human-readable activity entries you actually report.",
+      "description": "Turn your git history and Profile Plus activity into the human-readable reports you actually submit.",
       "skills": [
-        "pis-todo"
+        "pis-todo",
+        "pis-todo-to-tch"
       ]
     }
   ]
