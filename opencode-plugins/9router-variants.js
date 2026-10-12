@@ -23,27 +23,41 @@ async function readApiKeyFromAuthStore(providerID) {
   }
 }
 
+const BUILTIN_EFFORTS = ["none", "minimal", "low", "medium", "high", "xhigh", "max"]
+
 function buildVariants(rawModel) {
   const tiers = rawModel?.capabilities?.effort_tiers
   if (!Array.isArray(tiers)) {
     return undefined
   }
 
-  const variants = {}
+  const advertised = new Set()
   for (const tier of tiers) {
     if (typeof tier !== "string") {
       continue
     }
 
     const value = tier.trim()
-    if (value.length === 0) {
-      continue
+    if (value.length > 0) {
+      advertised.add(value)
     }
-
-    variants[value] = { reasoningEffort: value }
   }
 
-  return Object.keys(variants).length > 0 ? variants : undefined
+  if (advertised.size === 0) {
+    return undefined
+  }
+
+  const variants = {}
+  for (const value of advertised) {
+    variants[value] = { reasoningEffort: value }
+  }
+  for (const effort of BUILTIN_EFFORTS) {
+    if (!advertised.has(effort)) {
+      variants[effort] = { disabled: true }
+    }
+  }
+
+  return variants
 }
 
 export const NineRouterVariants = async () => ({
