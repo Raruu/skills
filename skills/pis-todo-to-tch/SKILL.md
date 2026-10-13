@@ -1,6 +1,6 @@
 ---
 name: pis-todo-to-tch
-description: "Turn Profile Plus todos (MCP profile-plus) into a formatted Polinema internship log book (DOCX + PDF). Use whenever the user runs /pis-todo-to-tch, or asks to \"buat log book\", \"bikin laporan magang\", \"generate log book\", \"cetak log book\", \"rekap todo jadi log book\", \"log book bulanan\", or wants their Profile Plus todo/attendance data converted into the official LOG BOOK KEGIATAN document. Supports month, month/week, and date-range periods, and outputs to a 'Laporan <Bulan>' folder in the current working directory. The SETUP argument bootstraps an empty working folder (personal config, environment report)."
+description: "Turn Profile Plus todos (MCP profile-plus) into a formatted Polinema internship log book (DOCX + PDF). Use whenever the user runs /pis-todo-to-tch, or asks to \"buat log book\", \"bikin laporan magang\", \"generate log book\", \"cetak log book\", \"rekap todo jadi log book\", \"log book bulanan\", or wants their Profile Plus todo/attendance data converted into the official LOG BOOK KEGIATAN document. With no period it defaults to the current work week (Mon-Fri); also supports month, month/week, and date-range periods, and outputs to a 'Laporan <Bulan>' folder in the current working directory. PDFs are converted from the DOCX via LibreOffice when available, with an fpdf2 fallback. The SETUP argument bootstraps an empty working folder (personal config, environment report)."
 ---
 
 # PIS Todo → TCH (Log Book) — Profile Plus → Log Book DOCX/PDF
@@ -20,7 +20,7 @@ Both segments are optional.
 
 | Segment | Meaning |
 |---|---|
-| 1 | Period. Empty = current month (1st → today). |
+| 1 | Period. Empty = current work week (Mon–Fri, up to today). |
 | 2 | Output format: `word`, `pdf`, or empty = both. |
 
 `SETUP` (case-insensitive, alone) is not a period — it switches to setup mode (see below). If the argument is exactly `SETUP`, jump to **Setup mode** and do not generate any document.
@@ -29,7 +29,7 @@ Period formats:
 
 | Input | Meaning |
 |---|---|
-| *(empty)* | Current month, 1st → today |
+| *(empty)* | Current work week: Monday–Friday, clipped to today (never future days) |
 | `September` | September of the current year (past month: full; current month: 1st → today) |
 | `September 2026` | Same, explicit year |
 | `September/minggu 2` | Calendar week 2 (Mon–Sun), clipped to the month |
@@ -55,7 +55,7 @@ Bootstraps an empty working folder. **Never generate a document in this mode** �
    ```
    python3 <skill-dir>/scripts/build-logbook.py --setup
    ```
-   It is read-only (creates nothing) and prints JSON: `cwd`, `config_exists`, `config`, `config_error`, `git` (`repo`/`root`/`ignored`), `python`, `libs` (`docx`/`fpdf`), `fonts.serif_found`, `assets`.
+   It is read-only (creates nothing) and prints JSON: `cwd`, `config_exists`, `config`, `config_error`, `git` (`repo`/`root`/`ignored`), `python`, `libs` (`docx`/`fpdf`), `libreoffice` (path to `soffice` or `null`), `fonts.serif_found`, `assets`.
 
 2. Show a short summary: the working folder (confirm it is the intended one), config status, missing libraries, git state.
 
@@ -68,7 +68,7 @@ Bootstraps an empty working folder. **Never generate a document in this mode** �
 
 5. **MCP smoke test**: call `profile-plus_get_todo_history` with `limit: 1`. Report OK or the failure — this is informational, not a blocker.
 
-6. **Final report**: config path, git state, libs, MCP, plus suggested next command (e.g. `/pis-todo-to-tch` for the current month). Do not generate anything.
+6. **Final report**: config path, git state, libs, LibreOffice, MCP, plus suggested next command (e.g. `/pis-todo-to-tch` for the current work week). Do not generate anything.
 
 ## Step 1 — Resolve the period
 
@@ -142,7 +142,9 @@ The script:
 - fills Jam Masuk/Pulang from attendance (`HH:MM`), or `-` when absent,
 - writes `Laporan <Bulan> <Tahun>/Log Book <label>.docx` and `.pdf` in the working directory.
 
-It prints JSON with `config`, `files`, `rows`, `overwritten`, `days_without_hours`, and `days_without_activities`. Requirements: Python 3 with `python-docx` and `fpdf2` (for PDF).
+PDF fidelity: when LibreOffice (`soffice`) is installed, the PDF is converted from the generated DOCX, so it matches the DOCX exactly. Without it, the script falls back to a built-in fpdf2 renderer (close but not pixel-identical) and adds a warning. The output JSON field `pdf_engine` is `"libreoffice"` or `"fpdf2"`.
+
+It prints JSON with `config`, `files`, `rows`, `overwritten`, `pdf_engine`, `days_without_hours`, and `days_without_activities`. Requirements: Python 3 with `python-docx`; `fpdf2` only needed for the PDF fallback.
 
 ## Step 5 — Report
 
@@ -173,7 +175,8 @@ Example:
 - **`--config` points to a missing file** → hard error; never auto-create an explicit config path.
 - **Future month/week** → the script rejects it; explain the period has not started.
 - **End date in the future** → the script clips it to today and adds a warning; surface it.
-- **No Python / missing libs** → `pip install python-docx fpdf2` (or `uv pip install`). If PDF fails, retry with `--format word` and tell the user.
+- **No Python / missing libs** → `pip install python-docx fpdf2` (or `uv pip install`). `fpdf2` is only needed for the PDF fallback.
+- **No LibreOffice** → PDF still works via the fpdf2 fallback; tell the user the layout may differ slightly and that installing LibreOffice (e.g. `sudo pacman -S libreoffice-fresh`) makes the PDF identical to the DOCX. Never install it yourself.
 - **Weekend rows** → only appear when there is todo or attendance data on those days.
 - **National holidays** → not detected; the day still appears if it is a weekday with attendance data. Mention that holidays can be edited manually in the DOCX.
 - **Status-only days** (CUTI/IZIN/SAKIT attendance, no todos) → Kegiatan shows the status label (Cuti/Izin/Sakit).

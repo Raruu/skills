@@ -7,11 +7,12 @@ Instead of retyping your activity log into the campus template, the skill reads 
 ## Requirements
 
 - **`profile-plus` MCP server** — source of todos and attendance.
-- **Python 3** with **`python-docx`** (DOCX generation) and **`fpdf2`** (PDF rendering):
+- **Python 3** with **`python-docx`** (DOCX generation):
   ```bash
   pip install python-docx fpdf2
   ```
-- A **serif font** for the PDF (Times New Roman if installed; Liberation Serif or DejaVu Serif work as fallbacks).
+- **LibreOffice** (optional but recommended) — the PDF is converted from the DOCX, so it matches exactly. Without it, a built-in **`fpdf2`** fallback renders the PDF (close, but not pixel-identical).
+- A **serif font** for the `fpdf2` fallback (Times New Roman if installed; Liberation Serif or DejaVu Serif work as fallbacks).
 
 ## Install
 
@@ -54,11 +55,11 @@ Reinstalling replaces the installed copy outright and warns if a duplicate skill
 /pis-todo-to-tch SETUP
 ```
 
-Both segments are optional. Without a period, the current month (1st → today) is used. Without a format, both DOCX and PDF are generated.
+Both segments are optional. Without a period, the current work week (Monday–Friday, up to today) is used. Without a format, both DOCX and PDF are generated.
 
 | Period input | Meaning |
 |---|---|
-| *(empty)* | Current month, 1st → today |
+| *(empty)* | Current work week: Monday–Friday, clipped to today (never future days) |
 | `September` / `September 2026` | That month (past: full month; current: 1st → today) |
 | `September/minggu 2` | Calendar week 2 (Mon–Sun), clipped to the month |
 | `September/minggu 2->3` | Calendar weeks 2 through 3 |
@@ -68,12 +69,12 @@ Both segments are optional. Without a period, the current month (1st → today) 
 
 `/pis-todo-to-tch SETUP` prepares an empty working folder without generating anything:
 
-- shows an environment report (config status, Python/libs, fonts, git),
+- shows an environment report (config status, Python/libs, LibreOffice, fonts, git),
 - asks for your personal data (or offers selective updates if the config already exists),
 - optionally adds `.pis-todo-to-tch.json` to `.gitignore`,
 - smoke-tests the `profile-plus` MCP connection.
 
-After SETUP, run `/pis-todo-to-tch` to generate the current month.
+After SETUP, run `/pis-todo-to-tch` to generate the current work week.
 
 ## Example
 
@@ -92,6 +93,8 @@ Laporan September 2026/
 The document contains the Polinema letterhead, your student info (from config), one row per working day with check-in/check-out times, one bullet per todo in the Kegiatan column, and the signature block.
 
 Weekend rows appear only when that day has data. Days without attendance show `-` in the time columns.
+
+The PDF is converted from the DOCX with LibreOffice when available (identical layout); otherwise a built-in `fpdf2` fallback renders it. The generated JSON reports which engine was used in `pdf_engine`.
 
 ## Config
 
@@ -114,7 +117,7 @@ If the working folder is a git repository, add `.pis-todo-to-tch.json` to `.giti
 
 ## Scripts
 
-`scripts/build-logbook.py` does all the deterministic work: period resolution (`--resolve-only` for a dry run), filling the DOCX template, and rendering the PDF.
+`scripts/build-logbook.py` does all the deterministic work: period resolution (`--resolve-only` for a dry run), filling the DOCX template, and rendering the PDF (LibreOffice conversion, or the `fpdf2` fallback).
 
 ```bash
 python3 scripts/build-logbook.py --input "September/minggu 2->3" --resolve-only

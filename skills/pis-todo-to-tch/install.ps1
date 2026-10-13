@@ -106,6 +106,15 @@ else {
     Write-Warn "python not found — the builder needs Python 3 with python-docx and fpdf2."
 }
 
+$soffice = Get-Command soffice -ErrorAction SilentlyContinue
+if ($soffice) {
+    Write-Say "LibreOffice detected — PDFs will match the DOCX exactly."
+}
+else {
+    Write-Say "LibreOffice not found — PDFs use the fpdf2 fallback (close, not pixel-identical)."
+    Write-Say "  Install it for exact PDFs: https://www.libreoffice.org/download/"
+}
+
 Write-Say ""
 Write-Say "Done. Next steps:"
 Write-Say "  1. Make sure the profile-plus MCP server is configured in OpenCode."

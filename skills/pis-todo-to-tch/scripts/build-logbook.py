@@ -4,7 +4,7 @@ build-logbook.py — Build a Polinema internship log book (DOCX + PDF)
 from Profile Plus todos and attendance records.
 
 Period resolution (--input):
-    ""                               current month, 1st -> today
+    ""                               current work week (Mon-Fri of this week, up to today)
     "September" / "September 2026"   that month (past: full; current: 1st -> today)
     "September/minggu 2"             calendar week 2 (Mon-Sun), clipped to month
     "September/minggu 2->3"          weeks 2 through 3
@@ -32,6 +32,7 @@ import argparse
 import calendar
 import json
 import re
+import shutil
 import sys
 from copy import deepcopy
 from datetime import date, datetime, timedelta
@@ -100,15 +101,34 @@ def week_bounds(year: int, month: int, w1: int, w2: int) -> tuple[date, date]:
     return start, end
 
 
+def work_week_bounds(today: date) -> tuple[date, date]:
+    """The current work week: Monday through Friday, clipped to today.
+
+    Never emits future days, so on a weekend it ends on that week's Friday.
+    """
+    monday = today - timedelta(days=today.weekday())
+    friday = monday + timedelta(days=4)
+    return monday, min(friday, today)
+
+
+def week_number_of(d: date, year: int, month: int) -> int:
+    """1-based calendar week of `d` within the given month (week 1 holds the 1st)."""
+    first = date(year, month, 1)
+    wk_start = first - timedelta(days=first.weekday())
+    return (d - wk_start).days // 7 + 1
+
+
 def parse_period(raw: str, today: date) -> dict:
     raw = (raw or "").strip()
     warnings: list[str] = []
 
     if not raw:
-        y, m = today.year, today.month
+        start, end = work_week_bounds(today)
+        y, mo = start.year, start.month
+        w = week_number_of(start, y, mo)
         return {
-            "mode": "bulan", "start": date(y, m, 1), "end": today,
-            "month": (y, m), "weeks": None, "warnings": warnings,
+            "mode": "pekan", "start": start, "end": end,
+            "month": (y, mo), "weeks": (w, w), "warnings": warnings,
         }
 
     m = re.match(r"^tanggal\s+(.+?)\s*->\s*(.+)$", raw, re.IGNORECASE)
@@ -160,6 +180,10 @@ def period_labels(period: dict) -> tuple[str, str]:
     """(folder_label, file_label)."""
     start, end = period["start"], period["end"]
     y, mo = period["month"]
+
+    if period["mode"] == "pekan":
+        w = period["weeks"][0]
+        return f"{BULAN[mo - 1]} {y}", f"{BULAN[mo - 1]} {y} - Minggu {w}"
 
     if period["mode"] == "minggu":
         w1, w2 = period["weeks"]
@@ -397,6 +421,64 @@ def fill_docx(template: Path, out_path: Path, cfg: dict, days: list[dict]) -> No
 # PDF
 # --------------------------------------------------------------------------- #
 
+# LibreOffice gives a PDF byte-for-byte faithful to the DOCX; fpdf2 is the
+# fallback for machines without it.
+SOFFICE_CANDIDATES = [
+    "soffice",
+    "/usr/bin/soffice",
+    "/usr/lib/libreoffice/program/soffice",
+    "/opt/libreoffice/program/soffice",
+    "/snap/bin/libreoffice",
+    "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+    "C:/Program Files/LibreOffice/program/soffice.exe",
+    "C:/Program Files (x86)/LibreOffice/program/soffice.exe",
+]
+
+
+def find_soffice() -> str | None:
+    """Path to a LibreOffice headless binary, or None."""
+    for cand in SOFFICE_CANDIDATES:
+        found = shutil.which(cand)
+        if found:
+            return found
+        if Path(cand).exists():
+            return cand
+    return None
+
+
+def convert_docx_to_pdf(soffice: str, docx_path: Path, pdf_path: Path) -> bool:
+    """Convert `docx_path` to PDF with LibreOffice; True on success.
+
+    Runs headless with a throwaway profile so a running desktop session never
+    interferes. LibreOffice writes the PDF next to the input using the input's
+    stem, so we convert in a temp dir and move the result into place.
+    """
+    import subprocess
+    import tempfile
+
+    docx_path = docx_path.resolve()
+    with tempfile.TemporaryDirectory(prefix="pis-logbook-") as tmp:
+        profile = Path(tmp) / "profile"
+        outdir = Path(tmp) / "out"
+        outdir.mkdir(parents=True, exist_ok=True)
+        cmd = [
+            soffice, "--headless", "--norestore",
+            f"-env:UserInstallation={profile.as_uri()}",
+            "--convert-to", "pdf:writer_pdf_Export",
+            "--outdir", str(outdir), str(docx_path),
+        ]
+        try:
+            p = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
+        except (OSError, subprocess.SubprocessError):
+            return False
+        produced = outdir / (docx_path.stem + ".pdf")
+        if p.returncode != 0 or not produced.exists():
+            return False
+        pdf_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(produced), str(pdf_path))
+    return True
+
+
 def find_serif_fonts() -> tuple[Path | None, Path | None]:
     pairs = [
         ("/usr/share/fonts/wps-fonts/times.ttf", "/usr/share/fonts/wps-fonts/timesbd.ttf"),
@@ -512,18 +594,27 @@ def render_pdf(out_path: Path, cfg: dict, days: list[dict], label: str,
     if pdf.get_y() > 225:
         pdf.add_page()
     pdf.set_font(fam, "", 11)
+    lm = pdf.l_margin
+    right_x = lm + 4 * 25.4        # right column pinned 4.0" from the left margin
+    menget_x = lm + 2.5 * 25.4     # "Mengetahui," at 2.5"
+
+    # Student block (matches the DOCX 4.0" indent).
+    pdf.set_x(lm + 4 * 25.4)
     pdf.cell(0, 5.4, "Mahasiswa,", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(17)
+    pdf.set_x(lm + 4 * 25.4)
     pdf.cell(0, 5.4, pdf.txt(cfg["nama"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(9)
+
+    # Approval block: left column at the margin, right column at 4.0".
+    pdf.set_x(menget_x)
     pdf.cell(0, 5.4, "Mengetahui,", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
-    x = pdf.l_margin
-    pdf.cell(80, 5.4, "Dosen Pembimbing,", new_x=XPos.RIGHT, new_y=YPos.TOP)
-    pdf.set_x(x + 90)
+    pdf.cell(0, 5.4, "Dosen Pembimbing,", new_x=XPos.RIGHT, new_y=YPos.TOP)
+    pdf.set_x(right_x)
     pdf.cell(0, 5.4, "Pembimbing Lapangan", new_x=XPos.LMARGIN, new_y=YPos.NEXT)
     pdf.ln(17)
-    pdf.cell(80, 5.4, pdf.txt(cfg["dosen_pembimbing"]), new_x=XPos.RIGHT, new_y=YPos.TOP)
-    pdf.set_x(x + 90)
+    pdf.cell(0, 5.4, pdf.txt(cfg["dosen_pembimbing"]), new_x=XPos.RIGHT, new_y=YPos.TOP)
+    pdf.set_x(right_x)
     pdf.cell(0, 5.4, pdf.txt(cfg["pembimbing_lapangan"]), new_x=XPos.LMARGIN, new_y=YPos.NEXT)
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -587,6 +678,7 @@ def setup_report(cwd: Path) -> dict:
             "docx": importlib.util.find_spec("docx") is not None,
             "fpdf": importlib.util.find_spec("fpdf") is not None,
         },
+        "libreoffice": find_soffice(),
         "fonts": {"serif_found": find_serif_fonts()[0] is not None},
         "assets": {
             "template": DEFAULT_TEMPLATE.exists(),
@@ -653,7 +745,8 @@ def load_config(path: Path, explicit: bool) -> dict:
 
 def main() -> int:
     ap = argparse.ArgumentParser(description="Build an internship log book (DOCX + PDF).")
-    ap.add_argument("--input", default="", help='periode, mis. "September/minggu 2->3" atau "" (bulan berjalan)')
+    ap.add_argument("--input", default="",
+                    help='periode, mis. "September/minggu 2->3" atau "" (pekan kerja berjalan)')
     ap.add_argument("--format", default="both", choices=["both", "word", "pdf"])
     ap.add_argument("--data", default=None, help="file JSON berisi todos & attendance dari MCP")
     ap.add_argument("--outdir", default=".", help="folder kerja (default: current dir)")
@@ -719,9 +812,10 @@ def main() -> int:
 
     files: list[str] = []
     overwritten = False
+    docx_path = base.with_suffix(".docx")
+    pdf_engine = None
 
     if args.format in ("both", "word"):
-        docx_path = base.with_suffix(".docx")
         overwritten = overwritten or docx_path.exists()
         fill_docx(Path(args.template), docx_path, cfg, days)
         files.append(str(docx_path))
@@ -729,12 +823,39 @@ def main() -> int:
     if args.format in ("both", "pdf"):
         pdf_path = base.with_suffix(".pdf")
         overwritten = overwritten or pdf_path.exists()
-        try:
-            render_pdf(pdf_path, cfg, days, file_label, DEFAULT_LOGO)
-        except ImportError as e:
-            print(f"ERROR: PDF butuh fpdf2 ({e}). Pakai --format word atau: pip install fpdf2",
-                  file=sys.stderr)
-            return 1
+        soffice = find_soffice()
+        converted = False
+        if soffice:
+            if args.format == "pdf":
+                # No DOCX was requested: build a throwaway one just to convert.
+                import tempfile
+                with tempfile.TemporaryDirectory(prefix="pis-logbook-src-") as tmp:
+                    src = Path(tmp) / docx_path.name
+                    fill_docx(Path(args.template), src, cfg, days)
+                    converted = convert_docx_to_pdf(soffice, src, pdf_path)
+            else:
+                converted = convert_docx_to_pdf(soffice, docx_path, pdf_path)
+        if converted:
+            pdf_engine = "libreoffice"
+        else:
+            if soffice:
+                warnings.append(
+                    "LibreOffice ada tapi konversi gagal — PDF dibuat dengan renderer "
+                    "cadangan (format bisa sedikit berbeda dari DOCX)."
+                )
+            else:
+                warnings.append(
+                    "LibreOffice tidak ditemukan — PDF dibuat dengan renderer cadangan "
+                    "(format bisa sedikit berbeda dari DOCX). Pasang LibreOffice "
+                    "(mis. `sudo pacman -S libreoffice-fresh`) untuk PDF identik."
+                )
+            try:
+                render_pdf(pdf_path, cfg, days, file_label, DEFAULT_LOGO)
+                pdf_engine = "fpdf2"
+            except ImportError as e:
+                print(f"ERROR: PDF butuh LibreOffice atau fpdf2 ({e}). "
+                      f"Pakai --format word atau: pip install fpdf2", file=sys.stderr)
+                return 1
         files.append(str(pdf_path))
 
     no_hours = [d["date"].isoformat() for d in days if d["no_hours"]]
@@ -751,6 +872,7 @@ def main() -> int:
         "files": files,
         "rows": len(days),
         "overwritten": overwritten,
+        "pdf_engine": pdf_engine,
         "days_without_hours": no_hours,
         "days_without_activities": no_activities,
         "warnings": warnings,

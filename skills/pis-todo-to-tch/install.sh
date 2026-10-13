@@ -101,6 +101,13 @@ else
   warn "python3 not found — the builder needs Python 3 with python-docx and fpdf2."
 fi
 
+if command -v soffice >/dev/null 2>&1; then
+  say "LibreOffice detected — PDFs will match the DOCX exactly."
+else
+  say "LibreOffice not found — PDFs use the fpdf2 fallback (close, not pixel-identical)."
+  say "  Install it for exact PDFs, e.g.  sudo pacman -S libreoffice-fresh"
+fi
+
 say ""
 say "Done. Next steps:"
 say "  1. Make sure the profile-plus MCP server is configured in OpenCode."
