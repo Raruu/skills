@@ -9,6 +9,13 @@
         "pis-todo",
         "pis-todo-to-tch"
       ]
+    },
+    {
+      "title": "Media",
+      "description": "Generate images through the 9Router gateway with persistent model preferences and a learned resolution log.",
+      "skills": [
+        "9router-text-2-image"
+      ]
     }
   ]
 }
